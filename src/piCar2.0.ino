@@ -359,3 +359,14 @@ void updateSensors() {
 int readUltra(){
   return 0;
 }
+void guides(){
+  if (frontUltra<10){
+    Serial1.println("c,"+String(frontUltra)+",");
+  }
+}
+void avoid(){
+  if (frontUltra<7){
+    motorGo(0, 0, 0);
+    motorGo(1, 0, 0);
+  }
+}
