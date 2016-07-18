@@ -13,27 +13,6 @@ int redLight = 0;
 int blueLight = 0;
 long TLC = 0;
 Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
-/*  MonsterMoto Shield Example Sketch
-  date: 5/24/11
-  code by: Jim Lindblom
-  hardware by: Nate Bernstein
-  SparkFun Electronics
-
-  License: CC-SA 3.0, feel free to use this code however you'd like.
-  Please improve upon it! Let me know how you've made it better.
-
-  This is really simple example code to get you some basic
-  functionality with the MonsterMoto Shield. The MonsterMote uses
-  two VNH2SP30 high-current full-bridge motor drivers.
-
-  Use the motorGo(uint8_t motor, uint8_t direct, uint8_t pwm)
-  function to get motors going in either CW, CCW, BRAKEVCC, or
-  BRAKEGND. Use motorOff(int motor) to turn a specific motor off.
-
-  The motor variable in each function should be either a 0 or a 1.M
-  pwm in the motorGo function should be a value between 0 and 255.
-*/
-
 int frontUltra = 0;
 int frontUltraPin = 0;
 
