@@ -2,6 +2,14 @@
 #include <SoftwareSerial.h>
 #include <SPI.h>
 #include "Adafruit_BLE_UART.h"
+#include <NewPing.h>
+
+#define TRIGGER_PIN  12  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_PIN     11  // Arduino pin tied to echo pin on the ultrasonic sensor.
+#define MAX_DISTANCE 200 // Maximum distance we want to ping for (in centimeters). Maximum sensor distance is rated at 400-500cm.
+
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE); // NewPing setup of pins and maximum distance.
+
 bool siren = false;
 // Connect CLK/MISO/MOSI to hardware SPI
 // e.g. On UNO & compatible: CLK = 13, MISO = 12, MOSI = 11
@@ -349,24 +357,5 @@ int debug() {
 }
 
 void updateSensors() {
-  //front ultra sonic
-  frontUltra = readUltra();
-  if (frontUltra<7){
-    motorGo(0, 0, 0);
-    motorGo(1, 0, 0);
-  }
-}
-int readUltra(){
-  return 0;
-}
-void guides(){
-  if (frontUltra<10){
-    Serial1.println("c,"+String(frontUltra)+",");
-  }
-}
-void avoid(){
-  if (frontUltra<7){
-    motorGo(0, 0, 0);
-    motorGo(1, 0, 0);
-  }
+
 }
