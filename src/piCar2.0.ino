@@ -2,28 +2,19 @@
 #include <SoftwareSerial.h>
 #include <SPI.h>
 #include "Adafruit_BLE_UART.h"
-#include <NewPing.h>
-
-#define TRIGGER_PIN  12  // Arduino pin tied to trigger pin on the ultrasonic sensor.
-#define ECHO_PIN     11  // Arduino pin tied to echo pin on the ultrasonic sensor.
-#define MAX_DISTANCE 200 // Maximum distance we want to ping for (in centimeters). Maximum sensor distance is rated at 400-500cm.
-
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE); // NewPing setup of pins and maximum distance.
+#define ADAFRUITBLE_REQ 49
+#define ADAFRUITBLE_RDY 21     // This should be an interrupt pin, on Uno thats #2 or #3
+#define ADAFRUITBLE_RST 48
+Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
 
 bool siren = false;
-// Connect CLK/MISO/MOSI to hardware SPI
-// e.g. On UNO & compatible: CLK = 13, MISO = 12, MOSI = 11
-#define ADAFRUITBLE_REQ 10
-#define ADAFRUITBLE_RDY 2     // This should be an interrupt pin, on Uno thats #2 or #3
-#define ADAFRUITBLE_RST 9
 long eLight = 0;
 int redLight = 0;
 int blueLight = 0;
 long TLC = 0;
-Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
 int frontUltra = 0;
 int frontUltraPin = 0;
-
+bool eMode = false;
 //definitons
 #define ESTOP 0
 #define DEBUG 0
@@ -53,6 +44,8 @@ int seirnRed[5] = {22, 24, 26, 28, 30};
 int seirnBlue[5] = {23, 25, 27, 29, 31};
 int statpin = 13;
 void setup() {
+  BTLEserial.setDeviceName("Pi Car"); /* 7 characters max! */
+  BTLEserial.begin();
   pinMode(22, OUTPUT);
   pinMode(23, OUTPUT);
   pinMode(24, OUTPUT);
@@ -96,12 +89,66 @@ void alert(int level) {
     // lcd.print("ESTOP level 1!");
   }
 }
-bool eMode = false;
+void bluetooth(){
+  // Tell the nRF8001 to do whatever it should be working on.
+  BTLEserial.pollACI();
+
+  // Ask what is our current status
+  aci_evt_opcode_t status = BTLEserial.getState();
+  // If the status changed....
+  if (status != laststatus) {
+    // print it out!
+    if (status == ACI_EVT_DEVICE_STARTED) {
+        Serial.println(F("* Advertising started"));
+    }
+    if (status == ACI_EVT_CONNECTED) {
+        Serial.println(F("* Connected!"));
+    }
+    if (status == ACI_EVT_DISCONNECTED) {
+        Serial.println(F("* Disconnected or advertising timed out"));
+    }
+    // OK set the last status change to this one
+    laststatus = status;
+  }
+
+  if (status == ACI_EVT_CONNECTED) {
+    // Lets see if there's any data for us!
+    if (BTLEserial.available()) {
+      serialProcess(2);
+    }
+    // OK while we still have something to read, get a character and print it out
+    while (BTLEserial.available()) {
+      char c = BTLEserial.read();
+      Serial.print(c);
+    }
+
+    // Next up, see if we have any data to get from the Serial console
+
+    if (Serial.available()) {
+      // Read a line from Serial
+      Serial.setTimeout(100); // 100 millisecond timeout
+      String s = Serial.readString();
+
+      // We need to convert the line to bytes, no more than 20 at this time
+      uint8_t sendbuffer[20];
+      s.getBytes(sendbuffer, 20);
+      char sendbuffersize = min(20, s.length());
+
+      Serial.print(F("\n* Sending -> \"")); Serial.print((char *)sendbuffer); Serial.println("\"");
+
+      // write the data
+      BTLEserial.write(sendbuffer, sendbuffersize);
+    }
+  }
+}
 void loop() {
+  bluetooth();
   updateSensors();
   //seirn();
   if (eMode) {
     seirn();
+  }else{
+    serinLight(0,0);
   }
   if (Serial.available()) {
     serialProcess(0);
@@ -153,10 +200,8 @@ void serinLight(int red, int blue) {
   blueLight = blue;
 }
 void seirn() {
-  Serial.println(millis());
-  if (millis() % 50) {
-    tone(44, 1000);
-  }
+  //Serial.println(millis());
+
   if (millis() > eLight) {
     if (redLight == 0) {
       serinLight(1, 0);
@@ -192,11 +237,19 @@ int parsein(int type) {
   if (type == 0) {
     int c = Serial.parseInt();
     return c;
-  }
-  if (type == 1) {
+  }else if (type == 1) {
     int c = Serial1.parseInt();
-    Serial.println(c);
+    //Serial.println(c);
     Serial1.read();
+    return c;
+
+    //    case 2:
+    //      return BTLEserial.parseInt();
+    //      break;
+  }else if (type == 2) {
+    int c = BTLEserial.parseInt();
+   Serial.println(c);
+    //Serial.read();
     return c;
 
     //    case 2:
@@ -209,10 +262,19 @@ char sRead(int type) {
     char c = Serial.read();
     Serial.println(c);
     return c;
-  }  if (type == 1) {
+  }  else if (type == 1) {
     char c = Serial1.read();
-    Serial.println(c);
+    //Serial.println(c);
     Serial1.read();
+
+    return c;
+    //    case 2:
+    //      return BTLEserial.parseInt();
+    //      break;
+  } else if (type == 2) {
+    char c = BTLEserial.read();
+    Serial.println(c);
+    //BTLEserial.read();
 
     return c;
     //    case 2:
@@ -312,35 +374,29 @@ void serialProcess(int type) {
     //    }
   } else if (r == 'l') {
     char moder = sRead(type);
-    if (moder == 's') {
-      setHeadLight(type);
-    } else if (moder == 'f') {
-      flashHeadLight(type);
-    } else if (moder == 'r') {
+    if (moder == 'r') {
       Serial.println("Standered Lighting");
       if (eMode) {
         eMode = false;
-        serinLight(0, 0);
+        //serinLight(0, 0);
       } else {
         eMode = true;
-        serinLight(0, 0);
+        //serinLight(0, 0);
       }
-
-    }
-  }else if (r=='r'){
+    }else if (moder == 's') {
+      setHeadLight(type);
+    } else if (moder == 'f') {
+      flashHeadLight(type);
+    }else if (r=='r'){
     char moder = sRead(type);
-    if (moder=='s') {
-      int sensor = parsein(type);
-      switch (sensor) {
-        case 0:
-        //front ultrasonic
-        if (type==0){
-          int frontDist = frontUltra;
-          Serial.println(frontDist);
-        }
-        break;
-      };
-    } else if (moder=='c') {
+  }else if (moder=='s') {
+    int sensor = parsein(type);
+    switch (sensor) {
+      case 0:
+
+      break;
+    };
+  } else if (moder=='c') {
       /* code */
     }
   }
@@ -358,4 +414,11 @@ int debug() {
 
 void updateSensors() {
 
+}
+void readPower(){
+  float I_current_value;
+  I_current_value = (analogRead(cspin[0])*27); // get I in milliamps
+  unsigned int m0 = I_current_value; // convert to A
+  I_current_value = (analogRead(cspin[1])*27); // get I in milliamps
+  unsigned int m1 = I_current_value; // convert to A
 }
