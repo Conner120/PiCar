@@ -23,7 +23,7 @@ bool eMode = false;
 #define CCW  2
 #define BRAKEGND 3
 #define CS_THRESHOLD 100
-
+bool headLightON = false;
 //variable declarations
 int horn = 23;
 /*  VNH2SP30 pin definitions
@@ -36,16 +36,23 @@ int cspin[2] = {2, 3}; // CS: Current sense ANALOG input
 int enpin[2] = {0, 1}; // EN: Status of switches output (Analog pin)
 int RRWL = 35;
 int LRWL = 32;
-int RFWL = 36;
-int LFWL = 37;
+int RFWL = 40;
+int LFWL = 41;
 int RRRL = 33;
 int LRRL = 34;
-int seirnRed[5] = {22, 24, 26, 28, 30};
+int seirnRed[5] = {22, 24, 26 };
 int seirnBlue[5] = {23, 25, 27, 29, 31};
 int statpin = 13;
 void setup() {
   BTLEserial.setDeviceName("Pi Car"); /* 7 characters max! */
   BTLEserial.begin();
+  int setDelay = 200;
+  togalFor(RRRL,setDelay);
+  togalFor(LRRL,setDelay);
+  togalFor(RFWL,setDelay);
+  togalFor(LFWL,setDelay);
+  togalFor(RRWL,setDelay);
+  togalFor(LRWL,setDelay);
   pinMode(22, OUTPUT);
   pinMode(23, OUTPUT);
   pinMode(24, OUTPUT);
@@ -58,13 +65,14 @@ void setup() {
   pinMode(31, OUTPUT);
   Serial.begin(57600);
   Serial1.begin(57600);
-  pinMode(RRWL, OUTPUT);
-  pinMode(LRWL, OUTPUT);
+   pinMode(RRWL, OUTPUT);
+   pinMode(LRWL, OUTPUT);
   pinMode(RRRL, OUTPUT);
   pinMode(LRRL, OUTPUT);
-  pinMode(RFWL, OUTPUT);
-  pinMode(LFWL, OUTPUT);
+  // pinMode(RFWL, OUTPUT);
+  // pinMode(LFWL, OUTPUT);
   pinMode(statpin, OUTPUT);
+  //togalFor(RRRL,1000);
   Serial.println("startup");
   // Initialize digital pins as outputs
   for (int i = 0; i < 2; i++)
@@ -88,6 +96,12 @@ void alert(int level) {
     // lcd.setCursor(0,0);
     // lcd.print("ESTOP level 1!");
   }
+}
+void togalFor(int pin,int time){
+  pinMode(pin,OUTPUT);
+  digitalWrite(pin,HIGH);
+  delay(time);
+  digitalWrite(pin, LOW);
 }
 void bluetooth(){
   // Tell the nRF8001 to do whatever it should be working on.
@@ -148,7 +162,6 @@ void loop() {
   if (eMode) {
     seirn();
   }else{
-    serinLight(0,0);
   }
   if (Serial.available()) {
     serialProcess(0);
@@ -184,11 +197,11 @@ void motorOff(int motor) {
 */
 
 void serinLight(int red, int blue) {
-  digitalWrite(RFWL, red);
-  digitalWrite(LFWL, red);
+  digitalWrite(RRRL, red);
+  digitalWrite(LRRL, red);
+  digitalWrite(22, red);
+  digitalWrite(24, red);
   digitalWrite(26, red);
-  digitalWrite(28, red);
-  digitalWrite(30, red);
   digitalWrite(23, blue);
   digitalWrite(25, blue);
   digitalWrite(27, blue);
@@ -201,7 +214,6 @@ void serinLight(int red, int blue) {
 }
 void seirn() {
   //Serial.println(millis());
-
   if (millis() > eLight) {
     if (redLight == 0) {
       serinLight(1, 0);
@@ -298,8 +310,8 @@ void setHeadLight(int type) {
   Serial.read();
   digitalWrite(RRWL, RRW);
   digitalWrite(LRWL, LRW);
-  digitalWrite(RFWL, RFW);
-  digitalWrite(LFWL, LFW);
+  digitalWrite(RFWL, HIGH);
+  digitalWrite(LFWL, HIGH);
   digitalWrite(RRRL, LRR);
   digitalWrite(LRRL, RRR);
 }
@@ -378,17 +390,28 @@ void serialProcess(int type) {
       Serial.println("Standered Lighting");
       if (eMode) {
         eMode = false;
-        //serinLight(0, 0);
+        serinLight(0, 0);
       } else {
         eMode = true;
         //serinLight(0, 0);
       }
+    }else if (moder=='h'){
+      if (headLightON){
+        digitalWrite(LFWL, LOW);
+        digitalWrite(RFWL,LOW);
+        headLightON=false;
+      }else{
+      digitalWrite(LFWL, HIGH);
+      digitalWrite(RFWL,HIGH);
+      headLightON=true;
+    }
     }else if (moder == 's') {
       setHeadLight(type);
     } else if (moder == 'f') {
       flashHeadLight(type);
     }else if (r=='r'){
     char moder = sRead(type);
+
   }else if (moder=='s') {
     int sensor = parsein(type);
     switch (sensor) {
